@@ -1,72 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台股連動試算工具</title>
+    <style>
+        body { font-family: -apple-system, "Noto Sans TC", sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 500px; background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #1a73e8; margin-bottom: 20px; }
+        .status-bar { font-size: 12px; padding: 8px; border-radius: 8px; margin-bottom: 15px; text-align: center; background: #e8f0fe; color: #1967d2; }
+        .card { border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
+        .card h3 { margin: 0 0 10px 0; font-size: 16px; color: #3c4043; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
+        .input-box { flex: 1; }
+        label { display: block; font-size: 12px; color: #70757a; margin-bottom: 4px; }
+        input { width: 100%; padding: 8px; border: 1px solid #dadce0; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        .result { font-size: 18px; font-weight: bold; color: #d93025; text-align: right; margin-top: 5px; }
+        .result::before { content: "預估目標：$"; font-size: 14px; color: #70757a; font-weight: normal; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>台積電指標試算</h2>
+    <div id="status" class="status-bar">正在載入即時行情...</div>
+
+    <div class="card" style="background: #f8f9fa;">
+        <h3>台積電 (2330) 參數</h3>
+        <div class="input-group">
+            <div class="input-box">
+                <label>當前股價</label>
+                <input type="number" id="tsmc_p" value="1000" oninput="run()">
+            </div>
+            <div class="input-box">
+                <label>預計變動 (元)</label>
+                <input type="number" id="tsmc_change" value="10" oninput="run()">
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>元大台灣 50 (0050)</h3>
+        <div class="input-group">
+            <div class="input-box">
+                <label>現價</label>
+                <input type="number" id="p0050" value="190" oninput="run()">
+            </div>
+            <div class="input-box">
+                <label>權重 %</label>
+                <input type="number" id="w0050" value="56.5" oninput="run()">
+            </div>
+        </div>
+        <div id="res0050" class="result">0.00</div>
+    </div>
+
+    <div class="card">
+        <h3>富邦科技 (0052) <span id="splitTag" style="color:green; font-size:10px;"></span></h3>
+        <div class="input-group">
+            <div class="input-box">
+                <label>現價 (1:5分割後)</label>
+                <input type="number" id="p0052" value="45" oninput="run()">
+            </div>
+            <div class="input-box">
+                <label>權重 %</label>
+                <input type="number" id="w0052" value="62.3" oninput="run()">
+            </div>
+        </div>
+        <div id="res0052" class="result">0.00</div>
+    </div>
+</div>
+
 <script>
-async function getPrice(stockId) {
+// 強大的抓取函數，失敗時不會卡死
+async function safeFetch(id) {
     try {
-        // 動態計算日期：抓取過去 5 天到今天的資料，確保抓得到最新交易日
-        const now = new Date();
-        const fiveDaysAgo = new Date(now.getTime() - (5 * 24 * 60 * 60 * 1000));
-        const startDate = fiveDaysAgo.toISOString().split('T')[0];
-
-        const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${stockId}&start_date=${startDate}`;
-        
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (data.data && data.data.length > 0) {
-            // 取得陣列中最後一筆資料（即為最新的收盤價或現價）
-            const latestData = data.data[data.data.length - 1];
-            console.log(`${stockId} 最新資料日期: ${latestData.date}, 價格: ${latestData.close}`);
-            return latestData.close;
+        const date = new Date().toISOString().split('T')[0];
+        const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${id}&start_date=${date}`;
+        const res = await fetch(url);
+        const json = await res.json();
+        if (json.data && json.data.length > 0) {
+            return json.data[json.data.length - 1].close;
         }
-        return null;
+        // 如果今日無資料，抓取最近三日
+        const backupUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${id}&start_date=2025-12-15`;
+        const res2 = await fetch(backupUrl);
+        const json2 = await res2.json();
+        return json2.data[json2.data.length - 1].close;
     } catch (e) {
-        console.error(`${stockId} 抓取失敗:`, e);
+        console.log(id + " 自動抓取受限，請手動輸入");
         return null;
     }
 }
 
-async function fetchAllPrices() {
-    const statusEl = document.getElementById('status');
-    statusEl.innerText = "● 正在同步證交所即時數據...";
-    statusEl.style.color = "#f39c12";
-
-    // 取得三支標的的價格
-    const p2330 = await getPrice('2330');
-    const p0050 = await getPrice('0050');
-    const p0052 = await getPrice('0052');
-
-    // 只有在抓到資料時才更新畫面的數字
-    if (p2330) document.getElementById('tsmcCurrent').value = p2330;
-    if (p0050) document.getElementById('etf0050_price').value = p0050;
-    if (p0052) document.getElementById('etf0052_price').value = p0052;
-
-    if (!p2330 && !p0050) {
-        statusEl.innerText = "● 報價更新失敗，請檢查網路或 API 狀態";
-        statusEl.style.color = "#e74c3c";
-    } else {
-        statusEl.innerText = `● 資料更新成功 (${new Date().toLocaleTimeString()})`;
-        statusEl.style.color = "#27ae60";
-    }
+async function init() {
+    const ids = { 'tsmc_p': '2330', 'p0050': '0050', 'p0052': '0052' };
     
-    calculate();
+    for (let [domId, stockId] of Object.entries(ids)) {
+        const price = await safeFetch(stockId);
+        if (price) {
+            // 針對 0052 分割的特殊處理邏輯
+            if (stockId === '0052' && price > 100) {
+                document.getElementById(domId).value = (price / 5).toFixed(2);
+                document.getElementById('splitTag').innerText = "(已自動修正 1:5 分割價)";
+            } else {
+                document.getElementById(domId).value = price;
+            }
+        }
+    }
+    document.getElementById('status').innerText = "● 報價同步完成 (或請手動微調)";
+    run();
 }
 
-function calculate() {
-    const tsmcPrice = parseFloat(document.getElementById('tsmcCurrent').value) || 0;
-    const tsmcAdd = parseFloat(document.getElementById('tsmcAdd').value) || 0;
-    const tsmcRate = tsmcAdd / tsmcPrice;
+function run() {
+    const tsmc = parseFloat(document.getElementById('tsmc_p').value) || 1;
+    const change = parseFloat(document.getElementById('tsmc_change').value) || 0;
+    const ratio = change / tsmc;
 
-    // 計算 0050
-    const p50 = parseFloat(document.getElementById('etf0050_price').value) || 0;
-    const w50 = parseFloat(document.getElementById('etf0050_weight').value) / 100;
-    const res50 = p50 * (1 + tsmcRate * w50);
-    document.getElementById('res0050').innerText = isFinite(res50) ? res50.toFixed(2) : "--";
+    // 0050
+    const p50 = parseFloat(document.getElementById('p0050').value) || 0;
+    const w50 = parseFloat(document.getElementById('w0050').value) / 100;
+    document.getElementById('res0050').innerText = (p50 * (1 + ratio * w50)).toFixed(2);
 
-    // 計算 0052
-    const p52 = parseFloat(document.getElementById('etf0052_price').value) || 0;
-    const w52 = parseFloat(document.getElementById('etf0052_weight').value) / 100;
-    const res52 = p52 * (1 + tsmcRate * w52);
-    document.getElementById('res0052').innerText = isFinite(res52) ? res52.toFixed(2) : "--";
+    // 0052
+    const p52 = parseFloat(document.getElementById('p0052').value) || 0;
+    const w52 = parseFloat(document.getElementById('w0052').value) / 100;
+    document.getElementById('res0052').innerText = (p52 * (1 + ratio * w52)).toFixed(2);
 }
 
-window.onload = fetchAllPrices;
+// 啟動
+init();
 </script>
+
+</body>
+</html>
