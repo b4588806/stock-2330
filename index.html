@@ -5,130 +5,148 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>台股連動試算工具</title>
     <style>
-        body { font-family: -apple-system, "Noto Sans TC", sans-serif; background: #f0f2f5; padding: 20px; display: flex; justify-content: center; }
-        .container { width: 100%; max-width: 500px; background: white; padding: 20px; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        h2 { text-align: center; color: #1a73e8; margin-bottom: 20px; }
-        .status-bar { font-size: 12px; padding: 8px; border-radius: 8px; margin-bottom: 15px; text-align: center; background: #e8f0fe; color: #1967d2; }
-        .card { border: 1px solid #e0e0e0; border-radius: 12px; padding: 15px; margin-bottom: 15px; }
-        .card h3 { margin: 0 0 10px 0; font-size: 16px; color: #3c4043; }
-        .input-group { display: flex; gap: 10px; margin-bottom: 10px; }
-        .input-box { flex: 1; }
-        label { display: block; font-size: 12px; color: #70757a; margin-bottom: 4px; }
-        input { width: 100%; padding: 8px; border: 1px solid #dadce0; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
-        .result { font-size: 18px; font-weight: bold; color: #d93025; text-align: right; margin-top: 5px; }
-        .result::before { content: "預估目標：$"; font-size: 14px; color: #70757a; font-weight: normal; margin-right: 5px; }
+        :root { --primary: #1a73e8; --danger: #d93025; --bg: #f8f9fa; }
+        body { font-family: "PingFang TC", "Microsoft JhengHei", sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .container { width: 100%; max-width: 450px; background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); }
+        h2 { text-align: center; color: var(--primary); margin-top: 0; }
+        
+        .status-bar { font-size: 13px; padding: 10px; border-radius: 10px; margin-bottom: 20px; text-align: center; background: #e8f0fe; color: #1967d2; border: 1px solid #c2e7ff; }
+        
+        .card { border: 1px solid #f1f3f4; border-radius: 15px; padding: 15px; margin-bottom: 20px; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.02); }
+        .card h3 { margin: 0 0 12px 0; font-size: 16px; color: #202124; border-left: 4px solid var(--primary); padding-left: 10px; }
+        
+        .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 10px; }
+        label { display: block; font-size: 12px; color: #5f6368; margin-bottom: 5px; }
+        input { width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 8px; box-sizing: border-box; font-size: 16px; outline: none; }
+        input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px #e8f0fe; }
+
+        .result-box { text-align: right; border-top: 1px dashed #eee; margin-top: 10px; padding-top: 10px; }
+        .result-val { font-size: 22px; font-weight: bold; color: var(--danger); }
+        .result-label { font-size: 13px; color: #70757a; margin-right: 8px; }
+
+        .btn-update { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer; margin-bottom: 20px; transition: 0.3s; }
+        .btn-update:hover { background: #1557b0; }
+        .split-info { font-size: 11px; color: #188038; background: #e6f4ea; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>台積電指標試算</h2>
-    <div id="status" class="status-bar">正在載入即時行情...</div>
+    <h2>指標連動試算</h2>
+    
+    <button class="btn-update" onclick="fetchAllData()">🔄 點此更新即時股價</button>
+    <div id="status" class="status-bar">點擊上方按鈕獲取最新行情</div>
 
-    <div class="card" style="background: #f8f9fa;">
+    <div class="card" style="background: #fdfefe;">
         <h3>台積電 (2330) 參數</h3>
-        <div class="input-group">
-            <div class="input-box">
-                <label>當前股價</label>
-                <input type="number" id="tsmc_p" value="1000" oninput="run()">
+        <div class="input-row">
+            <div>
+                <label>當前現價</label>
+                <input type="number" id="tsmc_p" value="1000" oninput="calculate()">
             </div>
-            <div class="input-box">
+            <div>
                 <label>預計變動 (元)</label>
-                <input type="number" id="tsmc_change" value="10" oninput="run()">
+                <input type="number" id="tsmc_change" value="10" oninput="calculate()">
             </div>
         </div>
     </div>
 
     <div class="card">
         <h3>元大台灣 50 (0050)</h3>
-        <div class="input-group">
-            <div class="input-box">
+        <div class="input-row">
+            <div>
                 <label>現價</label>
-                <input type="number" id="p0050" value="190" oninput="run()">
+                <input type="number" id="p0050" value="190" oninput="calculate()">
             </div>
-            <div class="input-box">
-                <label>權重 %</label>
-                <input type="number" id="w0050" value="56.5" oninput="run()">
+            <div>
+                <label>台積電權重 %</label>
+                <input type="number" id="w0050" value="56.5" oninput="calculate()">
             </div>
         </div>
-        <div id="res0050" class="result">0.00</div>
+        <div class="result-box">
+            <span class="result-label">預估目標價</span>
+            <span id="res0050" class="result-val">--</span>
+        </div>
     </div>
 
     <div class="card">
-        <h3>富邦科技 (0052) <span id="splitTag" style="color:green; font-size:10px;"></span></h3>
-        <div class="input-group">
-            <div class="input-box">
-                <label>現價 (1:5分割後)</label>
-                <input type="number" id="p0052" value="45" oninput="run()">
+        <h3>富邦科技 (0052) <span id="tag0052" class="split-info" style="display:none;">已校正分割價</span></h3>
+        <div class="input-row">
+            <div>
+                <label>現價 (1:5 分割後)</label>
+                <input type="number" id="p0052" value="45" oninput="calculate()">
             </div>
-            <div class="input-box">
-                <label>權重 %</label>
-                <input type="number" id="w0052" value="62.3" oninput="run()">
+            <div>
+                <label>台積電權重 %</label>
+                <input type="number" id="w0052" value="62.3" oninput="calculate()">
             </div>
         </div>
-        <div id="res0052" class="result">0.00</div>
+        <div class="result-box">
+            <span class="result-label">預估目標價</span>
+            <span id="res0052" class="result-val">--</span>
+        </div>
     </div>
 </div>
 
 <script>
-// 強大的抓取函數，失敗時不會卡死
-async function safeFetch(id) {
-    try {
-        const date = new Date().toISOString().split('T')[0];
-        const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${id}&start_date=${date}`;
-        const res = await fetch(url);
-        const json = await res.json();
-        if (json.data && json.data.length > 0) {
-            return json.data[json.data.length - 1].close;
-        }
-        // 如果今日無資料，抓取最近三日
-        const backupUrl = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${id}&start_date=2025-12-15`;
-        const res2 = await fetch(backupUrl);
-        const json2 = await res2.json();
-        return json2.data[json2.data.length - 1].close;
-    } catch (e) {
-        console.log(id + " 自動抓取受限，請手動輸入");
-        return null;
-    }
-}
-
-async function init() {
-    const ids = { 'tsmc_p': '2330', 'p0050': '0050', 'p0052': '0052' };
-    
-    for (let [domId, stockId] of Object.entries(ids)) {
-        const price = await safeFetch(stockId);
-        if (price) {
-            // 針對 0052 分割的特殊處理邏輯
-            if (stockId === '0052' && price > 100) {
-                document.getElementById(domId).value = (price / 5).toFixed(2);
-                document.getElementById('splitTag').innerText = "(已自動修正 1:5 分割價)";
-            } else {
-                document.getElementById(domId).value = price;
-            }
-        }
-    }
-    document.getElementById('status').innerText = "● 報價同步完成 (或請手動微調)";
-    run();
-}
-
-function run() {
+// 計算核心邏輯
+function calculate() {
     const tsmc = parseFloat(document.getElementById('tsmc_p').value) || 1;
     const change = parseFloat(document.getElementById('tsmc_change').value) || 0;
     const ratio = change / tsmc;
 
-    // 0050
+    // 0050 計算
     const p50 = parseFloat(document.getElementById('p0050').value) || 0;
     const w50 = parseFloat(document.getElementById('w0050').value) / 100;
     document.getElementById('res0050').innerText = (p50 * (1 + ratio * w50)).toFixed(2);
 
-    // 0052
+    // 0052 計算
     const p52 = parseFloat(document.getElementById('p0052').value) || 0;
     const w52 = parseFloat(document.getElementById('w0052').value) / 100;
     document.getElementById('res0052').innerText = (p52 * (1 + ratio * w52)).toFixed(2);
 }
 
-// 啟動
-init();
+// 抓取資料邏輯
+async function fetchPrice(id) {
+    try {
+        const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${id}&start_date=2025-12-10`;
+        const res = await fetch(url);
+        const json = await res.json();
+        if (json.data && json.data.length > 0) {
+            return json.data[json.data.length - 1].close;
+        }
+        return null;
+    } catch (e) {
+        return null;
+    }
+}
+
+async function fetchAllData() {
+    const status = document.getElementById('status');
+    status.innerText = "⏳ 正在同步證交所數據...";
+    
+    const p2330 = await fetchPrice('2330');
+    const p0050 = await fetchPrice('0050');
+    let p0052 = await fetchPrice('0052');
+
+    if (p2330) document.getElementById('tsmc_p').value = p2330;
+    if (p0050) document.getElementById('p0050').value = p0050;
+    
+    if (p0052) {
+        // 0052 分割處理：如果抓到的是 200 多塊的舊價格，自動除以 5
+        if (p0052 > 100) {
+            p0052 = (p0052 / 5).toFixed(2);
+            document.getElementById('tag0052').style.display = 'inline';
+        }
+        document.getElementById('p0052').value = p0052;
+    }
+
+    status.innerText = "✅ 數據已更新 (" + new Date().toLocaleTimeString() + ")";
+    calculate();
+}
+
+// 初始計算一次
+calculate();
 </script>
 
 </body>
