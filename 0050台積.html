@@ -1,0 +1,72 @@
+<script>
+async function getPrice(stockId) {
+    try {
+        // 動態計算日期：抓取過去 5 天到今天的資料，確保抓得到最新交易日
+        const now = new Date();
+        const fiveDaysAgo = new Date(now.getTime() - (5 * 24 * 60 * 60 * 1000));
+        const startDate = fiveDaysAgo.toISOString().split('T')[0];
+
+        const url = `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockPrice&data_id=${stockId}&start_date=${startDate}`;
+        
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (data.data && data.data.length > 0) {
+            // 取得陣列中最後一筆資料（即為最新的收盤價或現價）
+            const latestData = data.data[data.data.length - 1];
+            console.log(`${stockId} 最新資料日期: ${latestData.date}, 價格: ${latestData.close}`);
+            return latestData.close;
+        }
+        return null;
+    } catch (e) {
+        console.error(`${stockId} 抓取失敗:`, e);
+        return null;
+    }
+}
+
+async function fetchAllPrices() {
+    const statusEl = document.getElementById('status');
+    statusEl.innerText = "● 正在同步證交所即時數據...";
+    statusEl.style.color = "#f39c12";
+
+    // 取得三支標的的價格
+    const p2330 = await getPrice('2330');
+    const p0050 = await getPrice('0050');
+    const p0052 = await getPrice('0052');
+
+    // 只有在抓到資料時才更新畫面的數字
+    if (p2330) document.getElementById('tsmcCurrent').value = p2330;
+    if (p0050) document.getElementById('etf0050_price').value = p0050;
+    if (p0052) document.getElementById('etf0052_price').value = p0052;
+
+    if (!p2330 && !p0050) {
+        statusEl.innerText = "● 報價更新失敗，請檢查網路或 API 狀態";
+        statusEl.style.color = "#e74c3c";
+    } else {
+        statusEl.innerText = `● 資料更新成功 (${new Date().toLocaleTimeString()})`;
+        statusEl.style.color = "#27ae60";
+    }
+    
+    calculate();
+}
+
+function calculate() {
+    const tsmcPrice = parseFloat(document.getElementById('tsmcCurrent').value) || 0;
+    const tsmcAdd = parseFloat(document.getElementById('tsmcAdd').value) || 0;
+    const tsmcRate = tsmcAdd / tsmcPrice;
+
+    // 計算 0050
+    const p50 = parseFloat(document.getElementById('etf0050_price').value) || 0;
+    const w50 = parseFloat(document.getElementById('etf0050_weight').value) / 100;
+    const res50 = p50 * (1 + tsmcRate * w50);
+    document.getElementById('res0050').innerText = isFinite(res50) ? res50.toFixed(2) : "--";
+
+    // 計算 0052
+    const p52 = parseFloat(document.getElementById('etf0052_price').value) || 0;
+    const w52 = parseFloat(document.getElementById('etf0052_weight').value) / 100;
+    const res52 = p52 * (1 + tsmcRate * w52);
+    document.getElementById('res0052').innerText = isFinite(res52) ? res52.toFixed(2) : "--";
+}
+
+window.onload = fetchAllPrices;
+</script>
